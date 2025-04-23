@@ -2,6 +2,7 @@ using SimToolAI.Utilities;
 using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Vector3 = System.Numerics.Vector3;
 
 namespace Examples.Unity.Managers
 {
@@ -79,10 +80,10 @@ namespace Examples.Unity.Managers
         /// Gets the movement direction from the input
         /// </summary>
         /// <returns>The movement direction, or Direction.None if no input</returns>
-        public Direction GetMovementDirection()
+        public Vector3 GetMovementDirection()
         {
             if (_moveAction == null)
-                return Direction.None;
+                return Vector3.Zero;
 
             // Get movement input
             Vector2 moveInput = _moveAction.ReadValue<Vector2>();
@@ -90,24 +91,24 @@ namespace Examples.Unity.Managers
             if (moveInput.sqrMagnitude > 0.1f)
             {
                 // Determine the direction based on input
-                Direction moveDirection = Direction.None;
+                Vector3 moveDirection = DirectionVector.None;
 
                 // Convert 2D input to a direction
                 if (Mathf.Abs(moveInput.x) > Mathf.Abs(moveInput.y))
                 {
                     // Horizontal movement takes precedence
-                    moveDirection = moveInput.x > 0 ? Direction.Right : Direction.Left;
+                    moveDirection = moveInput.x > 0 ? DirectionVector.Right : DirectionVector.Left;
                 }
                 else
                 {
                     // Vertical movement - in Unity's input system, positive Y is up
-                    moveDirection = moveInput.y > 0 ? Direction.Down : Direction.Up;
+                    moveDirection = moveInput.y > 0 ? DirectionVector.Down : DirectionVector.Up;
                 }
 
                 return moveDirection;
             }
 
-            return Direction.None;
+            return DirectionVector.None;
         }
 
         /// <summary>

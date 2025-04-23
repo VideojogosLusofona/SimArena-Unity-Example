@@ -1,6 +1,5 @@
 using SimToolAI.Core.Map;
 using SimToolAI.Core.Rendering.RenderStrategies;
-using SimToolAI.Utilities;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -15,7 +14,6 @@ namespace Examples.Unity.Managers
         [SerializeField] private Tilemap tilemap;
         [SerializeField] private TileBase wallTile;
         [SerializeField] private TileBase floorTile;
-        [SerializeField] private TextAsset mapText;
         [SerializeField] private Grid grid;
 
         /// <summary>
@@ -35,6 +33,26 @@ namespace Examples.Unity.Managers
         {
             ParseMap();
         }
+        
+        /// <summary>
+        /// Initializes the map
+        /// </summary>
+        public void Initialize(string mapPath)
+        {
+            ParseMap(mapPath);
+        }
+
+        private void ParseMap(string mapPath)
+        {
+            GridMapParser<GridMap> map = new GridMapParser<GridMap>();
+
+            Map = map.LoadMapFromFile(mapPath);
+
+            Map.Initialize(new UnityMapRenderable(map.GetMapGrid(), Map.Height, Map.Width,
+                tilemap, wallTile, floorTile));
+
+            Map.Renderable.Render();
+        }
 
         /// <summary>
         /// Parses the map from the text asset or file
@@ -43,7 +61,7 @@ namespace Examples.Unity.Managers
         {
             GridMapParser<GridMap> map = new GridMapParser<GridMap>();
 
-            Map = mapText ? map.LoadMapFromText(mapText.text) : map.LoadMapFromFile();
+            Map = map.LoadMapFromFile();
 
             Map.Initialize(new UnityMapRenderable(map.GetMapGrid(), Map.Height, Map.Width,
                 tilemap, wallTile, floorTile));

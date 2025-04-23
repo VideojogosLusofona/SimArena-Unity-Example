@@ -3,6 +3,7 @@ using SimToolAI.Core.Entities;
 using SimToolAI.Core.Rendering;
 using SimToolAI.Utilities;
 using System.Collections.Generic;
+using SimToolAI.Core;
 using SimToolAI.Core.Rendering.RenderStrategies;
 using UnityEngine;
 
@@ -15,6 +16,7 @@ namespace Examples.Unity.Managers
     {
         [Header("Bullet Settings")]
         [SerializeField] private GameObject bulletPrefab;
+        [SerializeField] private Grid grid;
         [SerializeField] private float fireRate = 0.25f;
         [SerializeField] private int initialPoolSize = 20;
 
@@ -42,12 +44,22 @@ namespace Examples.Unity.Managers
         /// Initializes the bullet manager
         /// </summary>
         /// <param name="scene">The scene</param>
-        public void Initialize(UnityScene scene)
+        /// <param name="simulation">The simulation</param>
+        public void Initialize(UnityScene scene, Simulation simulation)
         {
             InitializeBulletPool();
 
             // Subscribe to the entity removed event to handle bullet recycling
             scene.EntityRemoved += OnEntityRemoved;
+
+            simulation.OnCreate += (_, ent) =>
+            {
+                if (ent is Bullet bullet)
+                {
+                    bullet.MaxRange = 50;
+                    CreateBulletObject(bullet);
+                }
+            };
         }
 
         /// <summary>
@@ -55,11 +67,7 @@ namespace Examples.Unity.Managers
         /// </summary>
         /// <param name="deltaTime">Time elapsed since the last update</param>
         /// <param name="player">The player</param>
-        /// <param name="playerAnimations">The player animations</param>
-        /// <param name="scene">The scene</param>
-        /// <param name="grid">The grid</param>
-        public void ManualUpdate(float deltaTime, Player player, 
-            PlayerAnimations playerAnimations, UnityScene scene, Grid grid)
+        public void ManualUpdate(float deltaTime, Player player)
         {
             if (_isFiring && player != null)
             {
@@ -68,7 +76,7 @@ namespace Examples.Unity.Managers
                 // Check if enough time has passed since the last shot
                 if (_timeSinceLastShot >= fireRate)
                 {
-                    FireBullet(player, playerAnimations, scene, grid);
+                    player.ProcessInput(null, true);
                     _timeSinceLastShot = 0f;
                 }
             }
@@ -79,9 +87,7 @@ namespace Examples.Unity.Managers
         /// </summary>
         /// <param name="player">The player</param>
         /// <param name="playerAnimations">The player animations</param>
-        /// <param name="scene">The scene</param>
-        /// <param name="grid">The grid</param>
-        public void StartFiring(Player player, PlayerAnimations playerAnimations, UnityScene scene, Grid grid)
+        public void StartFiring(Player player, PlayerAnimations playerAnimations)
         {
             if (player == null)
                 return;
@@ -90,8 +96,10 @@ namespace Examples.Unity.Managers
             _isFiring = true;
 
             // Fire immediately on first press
-            FireBullet(player, playerAnimations, scene, grid);
+            player.ProcessInput(null, true);
             _timeSinceLastShot = 0f;
+            
+            playerAnimations.TriggerAnimation(PlayerAnimations.SHOOT_ANIMATION);
         }
 
         /// <summary>
@@ -117,34 +125,10 @@ namespace Examples.Unity.Managers
         }
 
         /// <summary>
-        /// Fires a bullet
-        /// </summary>
-        /// <param name="player">The player</param>
-        /// <param name="playerAnimations">The player animations</param>
-        /// <param name="scene">The scene</param>
-        /// <param name="grid">The grid</param>
-        private void FireBullet(Player player, PlayerAnimations playerAnimations, UnityScene scene, Grid grid)
-        {
-            // Cosmetics
-            playerAnimations.TriggerAnimation(PlayerAnimations.SHOOT_ANIMATION);
-
-            // Fire a bullet in the player's facing direction
-            var bullet = CommandSystem.FireBullet(player, scene, 8, 8);
-
-            // Create a Unity representation for the bullet
-            if (bullet != null)
-            {
-                bullet.MaxRange = 50;
-                CreateBulletObject(bullet, grid);
-            }
-        }
-
-        /// <summary>
         /// Creates or reuses a Unity representation for a bullet
         /// </summary>
         /// <param name="bullet">The bullet</param>
-        /// <param name="grid">The grid</param>
-        private void CreateBulletObject(Bullet bullet, Grid grid)
+        private void CreateBulletObject(Bullet bullet)
         {
             var bulletObj =
                 // Try to get a bullet from the pool

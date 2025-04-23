@@ -1,4 +1,5 @@
 using Examples.Unity.Cosmetic;
+using SimToolAI.Core;
 using SimToolAI.Core.Entities;
 using SimToolAI.Core.Map;
 using SimToolAI.Core.Rendering;
@@ -43,18 +44,18 @@ namespace Examples.Unity.Managers
         /// <param name="map">The map</param>
         /// <param name="scene">The scene</param>
         /// <param name="grid">The grid</param>
-        public void CreatePlayer(ISimMap map, UnityScene scene, Grid grid)
+        public void CreatePlayer(ISimMap map, UnityScene scene, Grid grid, Simulation simulation)
         {
             var startPos = map.GetRandomWalkableLocation() ?? (5, 5);
 
-            Player = new Player("Player", startPos.Item1, startPos.Item2, 10)
+            Player = new Player("Player", startPos.Item1, startPos.Item2, 10, simulation)
             {
                 Health = 100,
                 MaxHealth = 100,
                 AttackPower = 10,
                 Defense = 5,
                 Speed = moveSpeed,
-                FacingDirection = Direction.Right
+                FacingDirection = DirectionVector.Right
             };
 
             // Initialize the target position to the player's starting position
@@ -83,9 +84,9 @@ namespace Examples.Unity.Managers
         /// <param name="map">The map</param>
         /// <param name="grid">The grid</param>
         /// <returns>True if the player moved, false otherwise</returns>
-        public bool MovePlayer(Direction moveDirection, ISimMap map, Grid grid)
+        public bool MovePlayer(System.Numerics.Vector3 moveDirection, ISimMap map, Grid grid)
         {
-            bool moved = CommandSystem.MovePlayer(moveDirection, Player, map);
+            bool moved = Player.ProcessInput(moveDirection, false);
 
             if (moved)
             {
