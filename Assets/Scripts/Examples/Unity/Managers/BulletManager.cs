@@ -15,15 +15,16 @@ namespace Examples.Unity.Managers
     public class BulletManager : MonoBehaviour
     {
         [Header("Bullet Settings")]
-        [SerializeField] private GameObject bulletPrefab;
+        [SerializeField] private RenderableBridge bulletPrefab;
         [SerializeField] private Grid grid;
         [SerializeField] private float fireRate = 0.25f;
         [SerializeField] private int initialPoolSize = 20;
+        [SerializeField] private SimulationUnity simulationAgent;
 
         /// <summary>
         /// The bullet pool
         /// </summary>
-        private readonly Queue<GameObject> _bulletPool = new();
+        private readonly Queue<RenderableBridge> _bulletPool = new();
 
         /// <summary>
         /// The active bullets
@@ -76,7 +77,17 @@ namespace Examples.Unity.Managers
                 // Check if enough time has passed since the last shot
                 if (_timeSinceLastShot >= fireRate)
                 {
-                    player.ProcessInput(null, true);
+                    // Create a new bullet in the simulation
+                    var bullet = new Bullet(player.X, player.Y, player.FacingDirection, player.Simulation, player)
+                    {
+                        FacingDirection = player.FacingDirection,
+                        Speed = 10f,
+                        Damage = player.AttackPower
+                    };
+                    
+                    // Add the bullet to the simulation
+                    player.Simulation.ProcessNewCreation(bullet);
+                    
                     _timeSinceLastShot = 0f;
                 }
             }
@@ -118,8 +129,8 @@ namespace Examples.Unity.Managers
         {
             for (int i = 0; i < initialPoolSize; i++)
             {
-                GameObject bulletObj = Instantiate(bulletPrefab, transform);
-                bulletObj.SetActive(false);
+                RenderableBridge bulletObj = Instantiate(bulletPrefab, transform);
+                bulletObj.gameObject.SetActive(false);
                 _bulletPool.Enqueue(bulletObj);
             }
         }
@@ -130,16 +141,29 @@ namespace Examples.Unity.Managers
         /// <param name="bullet">The bullet</param>
         private void CreateBulletObject(Bullet bullet)
         {
-            var bulletObj =
-                // Try to get a bullet from the pool
-                _bulletPool.Count > 0 ? _bulletPool.Dequeue() :
-                // If the pool is empty, create a new bullet
-                Instantiate(bulletPrefab);
+            GameObject bulletObj;
+
+            if (_bulletPool.Count > 0)
+            {
+                RenderableBridge bridge = _bulletPool.Dequeue();
+                bullet.Avatar = bridge.GetRenderable(simulationAgent.SimulationAdapter.Simulation, bullet);
+                bulletObj = bridge.gameObject;
+            }
+            else
+            {
+                RenderableBridge obj = Instantiate(bulletPrefab);
+                bullet.Avatar = obj.GetRenderable(simulationAgent.SimulationAdapter.Simulation, bullet);
+                bulletObj = obj.gameObject;
+            }
 
             // Activate and position the bullet
             bulletObj.SetActive(true);
             bulletObj.transform.position = grid.GetCellCenterWorld(new Vector3Int(bullet.X, bullet.Y));
             bulletObj.name = $"Bullet_{bullet.Id}";
+
+            // Set the bullet's rotation based on its direction
+            float angle = DirectionVector.GetRotationAngle(bullet.FacingDirection);
+            bulletObj.transform.rotation = Quaternion.Euler(0, 0, angle);
 
             // Track the active bullet
             _activeBullets[bullet] = bulletObj;
@@ -150,8 +174,8 @@ namespace Examples.Unity.Managers
             bulletRenderableData.Set("grid", grid);
             bulletRenderableData.Set("entity", bullet);
 
-            UnityEntityRenderable bulletRenderable = new UnityEntityRenderable(bulletRenderableData);
-            bullet.Avatar = bulletRenderable;
+            //UnityEntityRenderable bulletRenderable = new UnityEntityRenderable(bulletRenderableData);
+            //bullet.Avatar = bulletRenderable;
         }
 
         /// <summary>
@@ -163,7 +187,7 @@ namespace Examples.Unity.Managers
             {
                 // Return the bullet to the pool
                 bulletObj.SetActive(false);
-                _bulletPool.Enqueue(bulletObj);
+                _bulletPool.Enqueue(bulletObj.GetComponent<RenderableBridge>());
 
                 // Remove from active bullets
                 _activeBullets.Remove(bullet);

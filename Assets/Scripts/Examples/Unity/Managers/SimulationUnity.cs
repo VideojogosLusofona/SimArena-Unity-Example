@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using Examples.Unity.Adapters;
+using Examples.Unity.Cosmetic;
 using SimToolAI.Core;
 using SimToolAI.Core.Configuration;
 using SimToolAI.Core.Entities;
@@ -25,7 +26,7 @@ namespace Examples.Unity.Managers
         [SerializeField] private float updateInterval = 0.05f;
         
         [Header("Visualization")]
-        [SerializeField] private GameObject agentPrefab;
+        [SerializeField] private RenderableBridge agentPrefab;
         [SerializeField] private PlayerManager playerManager;
         [SerializeField] private InputManager inputManager;
         [SerializeField] private MapManager mapManager;
@@ -116,26 +117,66 @@ namespace Examples.Unity.Managers
         {
             if (_realTime)
             {
-                // Process movement input
+                // Process movement input - this only sends input to the simulation
                 ProcessMovementInput();
 
                 // Update the bullet manager
                 bulletManager.ManualUpdate(Time.deltaTime, playerManager.Player);
 
                 // Update the camera position
-                cameraController.UpdateCameraPosition(playerManager.PlayerObject.transform.position);
+                if (playerManager.PlayerObject != null)
+                {
+                    cameraController.UpdateCameraPosition(playerManager.PlayerObject.transform.position);
+                }
 
-                // Update and render the scene
-                _unityScene.Update(Time.deltaTime);
-                _unityScene.Render();
-            
-                // Update the simulation
+                // Update the simulation first (this will update the scene internally)
                 if (SimulationAdapter != null && SimulationAdapter.IsRunning)
                 {
                     SimulationAdapter.Update(Time.deltaTime);
                 }
                 
+                // Render the scene after simulation update
+                if (_unityScene != null)
+                {
+                    _unityScene.Render();
+                }
+                
+                // Smoothly move entities to their target positions
+                SmoothlyUpdateEntityPositions();
+                
+                // Update entity visualizations (health bars, etc.)
                 UpdateEntityVisualizations();
+            }
+        }
+        
+        /// <summary>
+        /// Smoothly updates entity positions for visual appeal
+        /// </summary>
+        private void SmoothlyUpdateEntityPositions()
+        {
+            // Smoothly move the player to its target position
+            if (playerManager.PlayerObject != null)
+            {
+                Vector3 targetPos = playerManager.GetTargetPosition();
+                playerManager.PlayerObject.transform.position = Vector3.Lerp(
+                    playerManager.PlayerObject.transform.position, 
+                    targetPos, 
+                    Time.deltaTime * playerManager.Player.Speed);
+            }
+            
+            // Smoothly move other entities to their target positions
+            foreach (var entity in SimulationAdapter.UnityScene.GetEntities<Entity>())
+            {
+                if (entity is Player) continue; // Skip player as it's handled above
+                
+                if (_entityObjects.TryGetValue(entity.Id, out GameObject obj))
+                {
+                    Vector3 targetPos = mapManager.Grid.GetCellCenterWorld(new Vector3Int(entity.X, entity.Y));
+                    obj.transform.position = Vector3.Lerp(
+                        obj.transform.position,
+                        targetPos,
+                        Time.deltaTime * entity.Speed);
+                }
             }
         }
 
@@ -235,11 +276,38 @@ namespace Examples.Unity.Managers
             // Initialize the simulation adapter with the map and scene
             SimulationAdapter.Initialize(Config, Map, _unityScene);
             
-            // Create the player
-            playerManager.CreatePlayer(mapManager.Map, _unityScene, mapManager.Grid, SimulationAdapter.Simulation);
-
-            // Initialize the bullet manager
+            Debug.Log("Initializing bullet manager...");
+            // Initialize the bullet manager first
             bulletManager.Initialize(_unityScene, SimulationAdapter.Simulation);
+            Debug.Log("Bullet manager initialized.");
+            
+            // Subscribe to entity events from the simulation
+            SimulationAdapter.Simulation.OnMove += OnEntityMoved;
+            SimulationAdapter.Simulation.OnCreate += OnEntityCreated;
+            
+            Debug.Log("Creating player...");
+            // Create the player after simulation is initialized
+            // This ensures the player is properly registered with the simulation
+            playerManager.CreatePlayer(mapManager.Map, mapManager.Grid, SimulationAdapter.Simulation);
+            Debug.Log("Player created.");
+            
+            // Register the player with the simulation if needed
+            if (playerManager.Player != null && !SimulationAdapter.Simulation.Agents.Contains(playerManager.Player))
+            {
+                Debug.Log("Adding player to simulation agents list");
+                SimulationAdapter.Simulation.Agents.Add(playerManager.Player);
+                SimulationAdapter.Simulation.Scene.AddEntity(playerManager.Player); 
+            }
+            else
+            {
+                Debug.LogWarning("Player was already added to simulation agents list");
+            }
+            
+            // Create visual representations for all existing entities
+            foreach (var entity in SimulationAdapter.UnityScene.GetEntities<Entity>())
+            {
+                CreateEntityObject(entity);
+            }
         }
         
         /// <summary>
@@ -294,11 +362,11 @@ namespace Examples.Unity.Managers
         }
         
         /// <summary>
-        /// Processes movement input from the input system
+        /// Processes movement input from the input system and sends it to the simulation
         /// </summary>
         private void ProcessMovementInput()
         {
-            if (!IsRunning)
+            if (!IsRunning || playerManager.Player == null)
                 return;
             
             // Only allow new movement input if the player is close to their target position
@@ -309,11 +377,8 @@ namespace Examples.Unity.Managers
 
                 if (moveDirection != DirectionVector.None)
                 {
-                    // Move the player
-                    playerManager.MovePlayer(moveDirection, mapManager.Map, mapManager.Grid);
-                    
-                    // Log the movement action
-                    SimulationAdapter.ProcessPlayerInput(playerManager.Player, moveDirection);
+                    // Send the input to the simulation through the player manager
+                    playerManager.SendMovementInput(moveDirection);
                 }
             }
         }
@@ -343,6 +408,13 @@ namespace Examples.Unity.Managers
         /// </summary>
         private void CleanupSimulation()
         {
+            // Unsubscribe from entity events
+            if (SimulationAdapter != null && SimulationAdapter.Simulation != null)
+            {
+                SimulationAdapter.Simulation.OnMove -= OnEntityMoved;
+                SimulationAdapter.Simulation.OnCreate -= OnEntityCreated;
+            }
+            
             // Destroy entity GameObjects
             foreach (var obj in _entityObjects.Values)
             {
@@ -362,6 +434,49 @@ namespace Examples.Unity.Managers
         }
         
         /// <summary>
+        /// Called when an entity is moved in the simulation
+        /// </summary>
+        private void OnEntityMoved(object sender, Entity entity)
+        {
+            // Update the visual position of the entity
+            if (entity is Player player && player.Equals(playerManager.Player))
+            {
+                // Update the player's visual position
+                playerManager.UpdateVisualPosition(mapManager.Grid);
+                
+                // Update field of view
+                mapManager.Map.ToggleFieldOfView(player);
+            }
+            else if (_entityObjects.TryGetValue(entity.Id, out GameObject obj))
+            {
+                // Update the object's position
+                Vector3 targetPos = mapManager.Grid.GetCellCenterWorld(new Vector3Int(entity.X, entity.Y));
+                
+                // For non-player entities, we can just set the position directly
+                obj.transform.position = targetPos;
+                
+                // Update the object's rotation based on facing direction
+                //float angle = DirectionVector.GetRotationAngle(entity.FacingDirection);
+                //obj.transform.Find("Avatar").transform.rotation = Quaternion.Euler(0, 0, angle);
+                entity.Avatar.Render();
+            }
+        }
+        
+        /// <summary>
+        /// Called when an entity is created in the simulation
+        /// </summary>
+        private void OnEntityCreated(object sender, Entity entity)
+        {
+            if (entity is Bullet)
+            {
+                return;
+            }
+            
+            // Create a visual representation for the entity
+            CreateEntityObject(entity);
+        }
+        
+        /// <summary>
         /// Updates the simulation
         /// </summary>
         private IEnumerator UpdateSimulation()
@@ -377,26 +492,18 @@ namespace Examples.Unity.Managers
         }
         
         /// <summary>
-        /// Updates entity visualizations
+        /// Updates entity visualizations (health bars, etc.)
         /// </summary>
         private void UpdateEntityVisualizations()
         {
             if (!IsInitialized || SimulationAdapter.UnityScene == null)
                 return;
                 
-            // Update existing entities
+            // Update existing entities (only health and status, not position)
             foreach (var entity in SimulationAdapter.UnityScene.GetEntities<Entity>())
             {
                 if (_entityObjects.TryGetValue(entity.Id, out GameObject obj))
                 {
-                    // Update the object's position
-                    obj.transform.position = mapManager.Grid.GetCellCenterWorld(new Vector3Int(entity.X, entity.Y));
-                    
-                    // Update the object's rotation based on facing direction
-                    float angle = DirectionVector.GetRotationAngle(entity.FacingDirection);
-                    
-                    obj.transform.rotation = Quaternion.Euler(0, 0, angle);
-                    
                     // Update health bar if the entity is a character
                     if (entity is Character character)
                     {
@@ -409,7 +516,7 @@ namespace Examples.Unity.Managers
                 }
                 else
                 {
-                    // Create a new object for the entity
+                    // Create a new object for the entity if it doesn't exist yet
                     CreateEntityObject(entity);
                 }
             }
@@ -451,13 +558,15 @@ namespace Examples.Unity.Managers
             }
             else
             {
-                GameObject obj = Instantiate(agentPrefab, 
+                RenderableBridge obj = Instantiate(agentPrefab, 
                     mapManager.Grid.GetCellCenterWorld(new Vector3Int(entity.X, entity.Y)), 
                     Quaternion.identity);
                 obj.name = entity.Name;
+
+                entity.Avatar = obj.GetRenderable(SimulationAdapter.Simulation, entity);
             
                 // Add the object to the dictionary
-                _entityObjects[entity.Id] = obj;
+                _entityObjects[entity.Id] = obj.gameObject;
             }
             
             // Set up the object's components

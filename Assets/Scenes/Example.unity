@@ -162,10 +162,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 033185c0ce7c44e9bbb485a64971875a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  bulletPrefab: {fileID: 5834548435660928795, guid: d70a64f703ed11b489a6da207dc5e500, type: 3}
+  bulletPrefab: {fileID: -104041320673865929, guid: d70a64f703ed11b489a6da207dc5e500, type: 3}
   grid: {fileID: 361535523}
   fireRate: 0.25
   initialPoolSize: 20
+  simulationAgent: {fileID: 986720300}
 --- !u!1 &361535521
 GameObject:
   m_ObjectHideFlags: 0
@@ -559,7 +560,7 @@ MonoBehaviour:
   loadOnStart: 1
   autoStart: 1
   updateInterval: 0.05
-  agentPrefab: {fileID: 7375144999536156576, guid: 123b9c58d6dbd6e43acf1fbb51ed3095, type: 3}
+  agentPrefab: {fileID: -1933777981427643574, guid: 123b9c58d6dbd6e43acf1fbb51ed3095, type: 3}
   playerManager: {fileID: 1337906984}
   inputManager: {fileID: 1947482369}
   mapManager: {fileID: 882101628}
@@ -661,7 +662,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3899d47552354237b2728f3bbb70e382, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerPrefab: {fileID: 7375144999536156576, guid: 9c281aec36ef4fc488060d985aa32e84, type: 3}
+  playerPrefab: {fileID: 2784247172674808889, guid: 9c281aec36ef4fc488060d985aa32e84, type: 3}
   moveSpeed: 5
 --- !u!1 &1358459537
 GameObject:

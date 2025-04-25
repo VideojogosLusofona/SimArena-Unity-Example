@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Numerics;
 using SimToolAI.Core;
 using SimToolAI.Core.Configuration;
@@ -89,14 +89,22 @@ namespace Examples.Unity.Adapters
         /// <param name="scene">The scene</param>
         public void Initialize(MatchConfig config, ISimMap map, UnityScene scene)
         {
-            // Create the simulation
-            Simulation = new Simulation(config, config.RealtimeMode? SimulationMode.Realtime : SimulationMode.Offline)
+            // Force realtime mode if there are human agents
+            SimulationMode mode = SimulationMode.Offline;
+            if (config.RealtimeMode || config.Agents.Exists(a => a.BrainType == BrainType.Human))
             {
-                // Set the map and scene
-                Map = map,
-                Scene = scene
-            };
-
+                mode = SimulationMode.Realtime;
+                
+                // Ensure MaxSteps is high enough for human play
+                if (config.MaxSteps < 10000)
+                {
+                    UnityEngine.Debug.Log("Increasing MaxSteps for human play");
+                    config.MaxSteps = 10000;
+                }
+            }
+            
+            // Create the simulation
+            Simulation = new Simulation(config, mode);
             UnityScene = scene;
             
             // Subscribe to simulation events
@@ -104,6 +112,8 @@ namespace Examples.Unity.Adapters
             
             // Initialize the simulation
             Simulation.Initialize(map, scene);
+            
+            UnityEngine.Debug.Log($"Simulation initialized in {mode} mode with {Simulation.Agents.Count} agents");
         }
         
         /// <summary>

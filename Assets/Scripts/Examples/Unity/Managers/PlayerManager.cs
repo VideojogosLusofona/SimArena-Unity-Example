@@ -2,7 +2,6 @@ using Examples.Unity.Cosmetic;
 using SimToolAI.Core;
 using SimToolAI.Core.Entities;
 using SimToolAI.Core.Map;
-using SimToolAI.Core.Rendering;
 using SimToolAI.Core.Rendering.RenderStrategies;
 using SimToolAI.Utilities;
 using UnityEngine;
@@ -15,7 +14,7 @@ namespace Examples.Unity.Managers
     public class PlayerManager : MonoBehaviour
     {
         [Header("Player Settings")]
-        [SerializeField] private GameObject playerPrefab;
+        [SerializeField] private RenderableBridge playerPrefab;
         [SerializeField] private float moveSpeed = 5f;
 
         /// <summary>
@@ -42,13 +41,17 @@ namespace Examples.Unity.Managers
         /// Creates the player at a random walkable location
         /// </summary>
         /// <param name="map">The map</param>
-        /// <param name="scene">The scene</param>
         /// <param name="grid">The grid</param>
-        public void CreatePlayer(ISimMap map, UnityScene scene, Grid grid, Simulation simulation)
+        /// <param name="simulation">The simulation</param>
+        public void CreatePlayer(ISimMap map, Grid grid, Simulation simulation)
         {
             var startPos = map.GetRandomWalkableLocation() ?? (5, 5);
 
-            Player = new Player("Player", startPos.Item1, startPos.Item2, 10, simulation)
+            RangedWeapon pistol = new RangedWeapon("Pistol", startPos.Item1, startPos.Item2, simulation);
+            
+            // Create a human-controlled player
+            Player = new Player("Player", startPos.Item1, startPos.Item2, 
+                10, simulation, new Weapon[] { pistol },true)
             {
                 Health = 100,
                 MaxHealth = 100,
@@ -57,47 +60,58 @@ namespace Examples.Unity.Managers
                 Speed = moveSpeed,
                 FacingDirection = DirectionVector.Right
             };
+            
+            pistol.SetOwner(Player);
 
             // Initialize the target position to the player's starting position
             _targetPos = grid.GetCellCenterWorld(new Vector3Int(Player.X, Player.Y));
 
-            PlayerObject = Instantiate(playerPrefab);
+            RenderableBridge obj = Instantiate(playerPrefab);
+            PlayerObject = obj.gameObject;
+            Player.Avatar = obj.GetRenderable(simulation, Player);
             PlayerObject.transform.position = _targetPos;
             PlayerAnimations = PlayerObject.GetComponent<PlayerAnimations>();
 
-            Data renderData = new Data();
-            renderData.Set("transform", PlayerObject.transform);
-            renderData.Set("grid", grid);
-            renderData.Set("entity", Player);
+            // Data renderData = new Data();
+            // renderData.Set("transform", PlayerObject.transform);
+            // renderData.Set("grid", grid);
+            // renderData.Set("entity", Player);
+            //
+            // UnityEntityRenderable playerRenderable = new UnityEntityRenderable(renderData);
+            // Player.Avatar = playerRenderable;
 
-            UnityEntityRenderable playerRenderable = new UnityEntityRenderable(renderData);
-            Player.Avatar = playerRenderable;
-
-            scene.AddEntity(Player);
+            // The player is already added to the scene in the Simulation.CreateAgents method
+            // We don't need to add it again, but we do need to ensure field of view is enabled
             map.ToggleFieldOfView(Player);
         }
 
         /// <summary>
-        /// Moves the player in the specified direction
+        /// Sends movement input to the simulation
         /// </summary>
         /// <param name="moveDirection">The direction to move</param>
-        /// <param name="map">The map</param>
-        /// <param name="grid">The grid</param>
-        /// <returns>True if the player moved, false otherwise</returns>
-        public bool MovePlayer(System.Numerics.Vector3 moveDirection, ISimMap map, Grid grid)
+        /// <returns>True if input was processed, false otherwise</returns>
+        public bool SendMovementInput(System.Numerics.Vector3 moveDirection)
         {
-            bool moved = Player.ProcessInput(moveDirection, false);
-
-            if (moved)
+            if (Player != null && Player.IsHumanControlled)
             {
-                // Update the player's facing direction
-                Player.FacingDirection = moveDirection;
-
+                // Just send the input to the player's brain
+                // The actual movement will be handled by the simulation
+                return Player.ProcessInput(moveDirection, false);
+            }
+            return false;
+        }
+        
+        /// <summary>
+        /// Updates the visual position of the player based on its logical position
+        /// </summary>
+        /// <param name="grid">The grid</param>
+        public void UpdateVisualPosition(Grid grid)
+        {
+            if (Player != null && PlayerObject != null)
+            {
                 // Update the target position for visualization
                 _targetPos = grid.GetCellCenterWorld(new Vector3Int(Player.X, Player.Y));
             }
-
-            return moved;
         }
 
         /// <summary>
