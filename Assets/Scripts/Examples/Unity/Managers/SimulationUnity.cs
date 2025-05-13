@@ -4,11 +4,15 @@ using System.Collections.Generic;
 using System.IO;
 using Examples.Unity.Adapters;
 using Examples.Unity.Cosmetic;
+using SimArena.Core.Configuration;
+using SimArena.Core.Entities;
+using SimArena.Core.Utilities;
 using SimToolAI.Core;
 using SimToolAI.Core.Configuration;
 using SimToolAI.Core.Entities;
 using SimToolAI.Core.Map;
 using SimToolAI.Core.Rendering;
+using SimToolAI.Unity;
 using SimToolAI.Utilities;
 using UnityEngine;
 
@@ -25,7 +29,7 @@ namespace Examples.Unity.Managers
         [SerializeField] private float updateInterval = 0.05f;
         
         [Header("Visualization")]
-        [SerializeField] private RenderableBridge agentPrefab;
+        [SerializeField] private GameObject agentPrefab;
         [SerializeField] private PlayerManager playerManager;
         [SerializeField] private InputManager inputManager;
         [SerializeField] private MapManager mapManager;
@@ -71,12 +75,6 @@ namespace Examples.Unity.Managers
         
         private bool _realTime = false;
         
-        #endregion
-
-        #region Events
-
-        public Action<GameObject, Entity> EntityCreatedEvent;
-
         #endregion
 
         #region Unity Lifecycle
@@ -176,11 +174,20 @@ namespace Examples.Unity.Managers
                 
                 if (_entityObjects.TryGetValue(entity.Id, out GameObject obj))
                 {
-                    Vector3 targetPos = mapManager.Grid.GetCellCenterWorld(new Vector3Int(entity.X, entity.Y));
+                    // Convert grid coordinates to world position
+                    Vector3 targetPos = mapManager.Grid.GetCellCenterWorld(new Vector3Int(entity.X, entity.Y, 0));
+                    
+                    // Ensure we're using the correct coordinate system
+                    targetPos.z = 0; // Keep everything on the same Z plane
+                    
                     obj.transform.position = Vector3.Lerp(
                         obj.transform.position,
                         targetPos,
                         Time.deltaTime * entity.Speed);
+                        
+                    // Update the object's rotation based on facing direction
+                    float angle = DirectionVector.GetRotationAngle(entity.FacingDirection);
+                    obj.transform.GetChild(0).rotation = Quaternion.Euler(0, 0, angle);
                 }
             }
         }
@@ -281,32 +288,23 @@ namespace Examples.Unity.Managers
             // Initialize the simulation adapter with the map and scene
             SimulationAdapter.Initialize(Config, Map, _unityScene);
             
-            Debug.Log("Initializing bullet manager...");
             // Initialize the bullet manager first
             bulletManager.Initialize(_unityScene, SimulationAdapter.Simulation);
-            Debug.Log("Bullet manager initialized.");
             
             // Subscribe to entity events from the simulation
             SimulationAdapter.Simulation.OnMove += OnEntityMoved;
             SimulationAdapter.Simulation.OnCreate += OnEntityCreated;
             
-            Debug.Log("Creating player...");
             // Create the player after simulation is initialized
             // This ensures the player is properly registered with the simulation
-            playerManager.CreatePlayer(mapManager.Map, mapManager.Grid, SimulationAdapter.Simulation);
-            Debug.Log("Player created.");
-            EntityCreatedEvent?.Invoke(playerManager.PlayerObject, playerManager.Player);
+            playerManager.CreatePlayer(mapManager.Map, _unityScene, mapManager.Grid, SimulationAdapter.Simulation);
             
             // Register the player with the simulation if needed
             if (playerManager.Player != null && !SimulationAdapter.Simulation.Agents.Contains(playerManager.Player))
             {
                 Debug.Log("Adding player to simulation agents list");
                 SimulationAdapter.Simulation.Agents.Add(playerManager.Player);
-                SimulationAdapter.Simulation.Scene.AddEntity(playerManager.Player); 
-            }
-            else
-            {
-                Debug.LogWarning("Player was already added to simulation agents list");
+                SimulationAdapter.Simulation.Scene.AddEntity(playerManager.Player);
             }
             
             // Create visual representations for all existing entities
@@ -455,16 +453,18 @@ namespace Examples.Unity.Managers
             }
             else if (_entityObjects.TryGetValue(entity.Id, out GameObject obj))
             {
-                // Update the object's position
-                Vector3 targetPos = mapManager.Grid.GetCellCenterWorld(new Vector3Int(entity.X, entity.Y));
+                // Convert grid coordinates to world position
+                Vector3 targetPos = mapManager.Grid.GetCellCenterWorld(new Vector3Int(entity.X, entity.Y, 0));
+                
+                // Ensure we're using the correct coordinate system
+                targetPos.z = 0; // Keep everything on the same Z plane
                 
                 // For non-player entities, we can just set the position directly
                 obj.transform.position = targetPos;
                 
                 // Update the object's rotation based on facing direction
-                //float angle = DirectionVector.GetRotationAngle(entity.FacingDirection);
-                //obj.transform.Find("Avatar").transform.rotation = Quaternion.Euler(0, 0, angle);
-                entity.Avatar.Render();
+                float angle = DirectionVector.GetRotationAngle(entity.FacingDirection);
+                obj.transform.GetChild(0).rotation = Quaternion.Euler(0, 0, angle);
             }
         }
         
@@ -473,11 +473,6 @@ namespace Examples.Unity.Managers
         /// </summary>
         private void OnEntityCreated(object sender, Entity entity)
         {
-            if (entity is Bullet)
-            {
-                return;
-            }
-            
             // Create a visual representation for the entity
             CreateEntityObject(entity);
         }
@@ -564,15 +559,17 @@ namespace Examples.Unity.Managers
             }
             else
             {
-                RenderableBridge obj = Instantiate(agentPrefab, 
-                    mapManager.Grid.GetCellCenterWorld(new Vector3Int(entity.X, entity.Y)), 
-                    Quaternion.identity);
+                // Convert grid coordinates to world position
+                Vector3 worldPos = mapManager.Grid.GetCellCenterWorld(new Vector3Int(entity.X, entity.Y, 0));
+                
+                // Ensure we're using the correct coordinate system
+                worldPos.z = 0; // Keep everything on the same Z plane
+                
+                GameObject obj = Instantiate(agentPrefab, worldPos, Quaternion.identity);
                 obj.name = entity.Name;
-
-                entity.Avatar = obj.GetRenderable(SimulationAdapter.Simulation, entity);
             
                 // Add the object to the dictionary
-                _entityObjects[entity.Id] = obj.gameObject;
+                _entityObjects[entity.Id] = obj;
             }
             
             // Set up the object's components
@@ -586,8 +583,6 @@ namespace Examples.Unity.Managers
                     healthBar.SetHealth(character.Health);
                 }
             }
-            
-            EntityCreatedEvent?.Invoke(_entityObjects[entity.Id], entity);
         }
         
         private void OnDrawGizmos()

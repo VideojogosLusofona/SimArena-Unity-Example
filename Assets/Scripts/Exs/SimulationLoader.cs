@@ -65,15 +65,194 @@ namespace Examples
                 Debug.LogError("No configuration file assigned!");
                 return;
             }
-            else if (loadOnStart && configFile != null && !string.IsNullOrEmpty(configFile.text))
+
+            if (loadOnStart && configFile != null && !string.IsNullOrEmpty(configFile.text))
             {
                 // Initialize UI
                 if (simulationEndPanel != null)
                     simulationEndPanel.SetActive(false);
             
                 // Load and start simulation
-                LoadSimulation();
+                StartCoroutine(LoadSimulationCoroutine());
             }
+        }
+
+        private IEnumerator LoadSimulationCoroutine()
+        {
+            GameConfig config = ValidateConfig();
+            yield return StartCoroutine(InitializeMapCoroutine(config));
+            InitializeScene();
+            CreateSimulation(config);
+            SubscribeToEvents();
+    
+            try
+            {
+                simulation.Initialize(simulationMap, simulationScene);
+                Debug.Log("Simulation initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Simulation initialization failed: {ex.Message}");
+            }
+            
+            if (autoStart)
+            {
+                Debug.Log("Starting simulation...");
+                try
+                {
+                    simulation.Start();
+                    Debug.Log("Simulation started successfully");
+                }
+                catch (Exception startEx)
+                {
+                    Debug.LogError($"Error starting simulation: {startEx.Message}");
+                }
+            }
+        }
+        
+        private void InitializeScene()
+        {
+            try
+            {
+                simulationScene = new MinimalScene(simulationMap);
+                Debug.Log("Scene created successfully");
+            }
+            catch (Exception sceneEx)
+            {
+                Debug.LogError($"Error creating scene: {sceneEx.Message}");
+            }
+        }
+        
+        private void CreateSimulation(GameConfig config)
+        {
+            // Create the simulation
+            try
+            {
+                if (!config.Validate(false, out string err))
+                {
+                    Debug.LogError($"Invalid configuration: {err}");
+                    return;
+                }
+                    
+                simulation = new Simulation(config, SimulationMode.Realtime);
+                Debug.Log("Simulation created successfully");
+            }
+            catch (Exception simEx)
+            {
+                Debug.LogError($"Error creating simulation: {simEx.Message}");
+                Debug.LogError($"Stack trace: {simEx.StackTrace}");
+            }
+        }
+        
+        private IEnumerator InitializeMapCoroutine(GameConfig config)
+        {
+            if (!string.IsNullOrEmpty(config.MapPath))
+            {
+                string fullMapPath = Path.Combine(Application.streamingAssetsPath, config.MapPath);
+
+                if (!string.IsNullOrEmpty(fullMapPath) && File.Exists(fullMapPath))
+                {
+                    config.MapPath = fullMapPath;
+                    Debug.Log($"Loading map from file: {config.MapPath}");
+                    try
+                    {
+                        mapManager.Initialize(config.MapPath);
+
+                        // Wait until mapManager.Map is no longer null
+                        float timeout = 5f;
+                        float timer = 0f;
+                        while (mapManager.Map == null && timer < timeout)
+                        {
+                            timer += Time.deltaTime;
+                        }
+
+                        if (mapManager.Map == null)
+                        {
+                            Debug.LogError("Map initialization timed out or failed.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"Error loading map from file: {ex.Message}");
+                    }
+                }
+            }
+            else
+            {
+                Debug.LogWarning("No valid map path provided, or file doesn't exist.");
+                yield break;
+            }
+        }
+
+        private GameConfig ValidateConfig()
+        {
+            GameConfig config;
+                
+            try {
+                // Try using the GameConfig's built-in method
+                config = GameConfig.LoadFromTextJson(configFile.text);
+                
+                if (config == null)
+                {
+                    Debug.LogError("Failed to parse configuration file with LoadFromTextJson. Check JSON format.");
+                    return null;
+                }
+                
+                Debug.Log($"Config parsed successfully. " +
+                          $"Game name: {config.Name}, " +
+                          $"Agent count: {config.Agents?.Count ?? 0}");
+                          
+               
+                _realTime = config.RealtimeMode;
+                
+                if (config.Agents.Exists(a => a.BrainType == BrainType.Human))
+                {
+                    _realTime = true;
+                }
+            }
+            catch (Exception parseEx)
+            {
+                Debug.LogError($"Error parsing configuration with LoadFromTextJson: {parseEx.Message}");
+                
+
+                Debug.Log("Falling back to JsonUtility...");
+                
+                try
+                {
+                    config = JsonUtility.FromJson<GameConfig>(configFile.text);
+                    
+                    if (config == null)
+                    {
+                        Debug.LogError("Failed to parse configuration with JsonUtility. Check JSON format.");
+                        Debug.LogError($"Config content: {configFile.text}");
+                        
+                        // Create a default config as a last resort
+                        Debug.LogWarning("Creating default configuration as fallback...");
+                        config = CreateDefaultConfig();
+                    }
+                    else
+                    {
+                        Debug.Log($"Config parsed successfully with JsonUtility. " +
+                                  $"Game name: {config.Name}, Agent count: {config.Agents?.Count ?? 0}");
+                    }
+                }
+                catch (Exception jsonEx)
+                {
+                    Debug.LogError($"Error parsing configuration with JsonUtility: {jsonEx.Message}");
+                    Debug.LogWarning("Creating default configuration as fallback...");
+                    config = CreateDefaultConfig();
+                }
+                
+                // Set realtime mode flag
+                _realTime = config.RealtimeMode;
+
+                if (config.Agents.Exists(a => a.BrainType == BrainType.Human))
+                {
+                    _realTime = true;
+                }
+            }
+
+            return config;
         }
         
         private void Update()
@@ -82,6 +261,19 @@ namespace Examples
             if (Time.frameCount % 300 == 0) // Approximately every 5 seconds at 60 FPS
             {
                 Debug.Log($"Simulation status - Exists: {simulation != null}, Running: {IsRunning}, RealTime: {_realTime}");
+                
+                // Log entity positions
+                if (entityGameObjects.Count > 0)
+                {
+                    foreach (var kvp in entityGameObjects)
+                    {
+                        Entity entity = simulation.GetEntities().FirstOrDefault(e => e.Id == kvp.Key);
+                        if (entity != null)
+                        {
+                            Debug.Log($"Entity {entity.Name} - Sim Position: ({entity.X}, {entity.Y}), Unity Position: {kvp.Value.transform.position}");
+                        }
+                    }
+                }
             }
             
             if (simulation != null && IsRunning && _realTime)
@@ -102,207 +294,6 @@ namespace Examples
                 
                 // Update visual positions with lerping
                 UpdateEntityPositions();
-            }
-        }
-        
-        private void LoadSimulation()
-        {
-            try
-            {
-                // Check if config file is assigned
-                if (configFile == null)
-                {
-                    Debug.LogError("Failed to load simulation: Config file is not assigned");
-                    return;
-                }
-                
-                // Parse the configuration file
-                Debug.Log("Parsing configuration file...");
-                GameConfig config;
-                
-                try {
-                    // Try using the GameConfig's built-in method
-                    config = GameConfig.LoadFromTextJson(configFile.text);
-                    
-                    if (config == null)
-                    {
-                        Debug.LogError("Failed to parse configuration file with LoadFromTextJson. Check JSON format.");
-                        return;
-                    }
-                    
-                    Debug.Log($"Config parsed successfully. " +
-                              $"Game name: {config.Name}, " +
-                              $"Agent count: {config.Agents?.Count ?? 0}");
-                              
-                    // Set realtime mode flag
-                    _realTime = config.RealtimeMode;
-                    
-                    if (config.Agents.Exists(a => a.BrainType == BrainType.Human))
-                    {
-                        _realTime = true;
-                    }
-                }
-                catch (Exception parseEx)
-                {
-                    Debug.LogError($"Error parsing configuration with LoadFromTextJson: {parseEx.Message}");
-                    
-                    // Fallback to JsonUtility
-                    Debug.Log("Falling back to JsonUtility...");
-                    try
-                    {
-                        config = JsonUtility.FromJson<GameConfig>(configFile.text);
-                        
-                        if (config == null)
-                        {
-                            Debug.LogError("Failed to parse configuration with JsonUtility. Check JSON format.");
-                            Debug.LogError($"Config content: {configFile.text}");
-                            
-                            // Create a default config as a last resort
-                            Debug.LogWarning("Creating default configuration as fallback...");
-                            config = CreateDefaultConfig();
-                        }
-                        else
-                        {
-                            Debug.Log($"Config parsed successfully with JsonUtility. Game name: {config.Name}, Agent count: {config.Agents?.Count ?? 0}");
-                        }
-                    }
-                    catch (Exception jsonEx)
-                    {
-                        Debug.LogError($"Error parsing configuration with JsonUtility: {jsonEx.Message}");
-                        Debug.LogWarning("Creating default configuration as fallback...");
-                        config = CreateDefaultConfig();
-                    }
-                    
-                    // Set realtime mode flag
-                    _realTime = config.RealtimeMode;
-
-                    if (config.Agents.Exists(a => a.BrainType == BrainType.Human))
-                    {
-                        _realTime = true;
-                    }
-                }
-                
-                // Create the simulation
-                try
-                {
-                    string fullMapPath = Path.Combine(Application.streamingAssetsPath, config.MapPath);
-                    
-                    // Check if the map path exists and modify if needed
-                    if (!string.IsNullOrEmpty(fullMapPath) && !File.Exists(fullMapPath))
-                    {
-                        Debug.LogWarning($"Map file not found at path: {config.MapPath}. Using procedural map instead.");
-                        config.MapPath = null; 
-                    }
-                    else
-                    {
-                        config.MapPath = fullMapPath;
-                    }
-                    
-                    if (!config.Validate(false, out string err))
-                    {
-                        Debug.LogError($"Invalid configuration: {err}");
-                        return;
-                    }
-                    
-                    simulation = new Simulation(config, SimulationMode.Realtime);
-                    Debug.Log("Simulation created successfully");
-                }
-                catch (Exception simEx)
-                {
-                    Debug.LogError($"Error creating simulation: {simEx.Message}");
-                    Debug.LogError($"Stack trace: {simEx.StackTrace}");
-                    return;
-                }
-                
-                // Create the map
-                Debug.Log("Creating map...");
-                try
-                {
-                    CreateMap(config);
-                    Debug.Log("Map created successfully");
-                }
-                catch (Exception mapEx)
-                {
-                    Debug.LogError($"Error creating map: {mapEx.Message}");
-                    return;
-                }
-                
-                // Create the scene
-                Debug.Log("Creating scene...");
-                try
-                {
-                    simulationScene = new MinimalScene(simulationMap);
-                    Debug.Log("Scene created successfully");
-                }
-                catch (Exception sceneEx)
-                {
-                    Debug.LogError($"Error creating scene: {sceneEx.Message}");
-                    return;
-                }
-                
-                // Subscribe to simulation events
-                Debug.Log("Subscribing to events...");
-                try
-                {
-                    SubscribeToEvents();
-                    Debug.Log("Events subscribed successfully");
-                }
-                catch (Exception eventEx)
-                {
-                    Debug.LogError($"Error subscribing to events: {eventEx.Message}");
-                    return;
-                }
-                
-                // Initialize the simulation
-                Debug.Log("Initializing simulation...");
-                try
-                {
-                    simulation.Initialize(simulationMap, simulationScene);
-                    Debug.Log("Simulation initialized successfully");
-                }
-                catch (Exception initEx)
-                {
-                    Debug.LogError($"Error initializing simulation: {initEx.Message}");
-                    return;
-                }
-                
-                // Start the simulation
-                if (autoStart)
-                {
-                    Debug.Log("Starting simulation...");
-                    try
-                    {
-                        simulation.Start();
-                        Debug.Log("Simulation started successfully");
-                    }
-                    catch (Exception startEx)
-                    {
-                        Debug.LogError($"Error starting simulation: {startEx.Message}");
-                    }
-                }
-                
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"Failed to load simulation: {ex.Message}");
-                Debug.LogError($"Stack trace: {ex.StackTrace}");
-            }
-        }
-        
-        private void CreateMap(GameConfig config)
-        {
-            // Check if we should load the map from a file
-            if (!string.IsNullOrEmpty(config.MapPath) && File.Exists(config.MapPath))
-            {
-                Debug.Log($"Loading map from file: {config.MapPath}");
-                try
-                {
-                    mapManager.Initialize(config.MapPath); ;
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"Error loading map from file: {ex.Message}");
-                }
             }
         }
         
@@ -328,8 +319,8 @@ namespace Examples
             }
             
             // Create a game object for the entity
-            GameObject entityObject = Instantiate(agentPrefab, new Vector3(entity.X, entity.Y, 0),
-                Quaternion.identity);
+            UnityEngine.Vector3 initialPosition = new UnityEngine.Vector3(entity.X, entity.Y, 0);
+            GameObject entityObject = Instantiate(agentPrefab, initialPosition, Quaternion.identity);
             entityObject.name = $"{entity.Name} ({entity.Id})";
             
             // Set up the entity representation
@@ -341,7 +332,11 @@ namespace Examples
             
             // Store the game object reference
             entityGameObjects[entity.Id] = entityObject;
-            targetPositions[entity.Id] = new Vector3(entity.X, entity.Y, 0);
+            targetPositions[entity.Id] = initialPosition;
+            
+            // Log the creation for debugging
+            Debug.Log($"Created entity {entity.Name} at position: X={entity.X}, Y={entity.Y} (Unity Vector3: {initialPosition})");
+            Debug.Log($"GameObject position after creation: {entityObject.transform.position}");
         }
         
         private void OnEntityDestroyed(object sender, Entity entity)
@@ -359,12 +354,23 @@ namespace Examples
         {
             if (entityGameObjects.ContainsKey(entity.Id))
             {
-                // Update the target position for lerping
-                Vector3 newPosition = new Vector3(entity.X, entity.Y, 0);
+                // Convert grid coordinates to world position using the grid
+                Vector3 newPosition = mapManager.Grid.GetCellCenterWorld(new Vector3Int(entity.X, entity.Y, 0));
                 targetPositions[entity.Id] = newPosition;
                 
                 // Debug log to confirm movement events are being received
-                Debug.Log($"Entity {entity.Name} moved to position: {newPosition}");
+                Debug.Log($"Entity {entity.Name} moved to position: X={entity.X}, Y={entity.Y} (Unity Vector3: {newPosition})");
+                
+                // Force immediate position update for debugging
+                if (entityGameObjects.TryGetValue(entity.Id, out GameObject entityObject))
+                {
+                    // Log the current position before updating
+                    Debug.Log($"Entity {entity.Name} current GameObject position: {entityObject.transform.position}");
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"Entity {entity.Name} moved but no GameObject found for ID: {entity.Id}");
             }
         }
         
@@ -396,8 +402,16 @@ namespace Examples
         
         private void OnEntityKilled(object sender, (Entity killer, Entity killed) killInfo)
         {
-            // Show kill feed notification
-            ShowKillFeedNotification(killInfo.killer.Name, killInfo.killed.Name);
+            // Check for null references before accessing properties
+            if (killInfo.killer != null && killInfo.killed != null)
+            {
+                // Show kill feed notification
+                ShowKillFeedNotification(killInfo.killer.Name, killInfo.killed.Name);
+            }
+            else
+            {
+                Debug.LogWarning("OnEntityKilled received null entity references");
+            }
         }
         
         private void OnSimulationStopped(object sender, ISimulationResult result)
@@ -441,25 +455,50 @@ namespace Examples
                 return;
             }
             
-            Debug.Log($"Updating positions for {entityGameObjects.Count} entities. Realtime mode: {_realTime}");
+            // Only log this message occasionally to reduce spam
+            if (Time.frameCount % 60 == 0)
+            {
+                Debug.Log($"Updating positions for {entityGameObjects.Count} entities. Realtime mode: {_realTime}");
+            }
             
-            foreach (var entityId in entityGameObjects.Keys)
+            // Create a temporary list to avoid collection modification issues
+            var entityIds = new List<Guid>(entityGameObjects.Keys);
+            
+            foreach (var entityId in entityIds)
             {
                 if (entityGameObjects.TryGetValue(entityId, out GameObject entityObject) && 
-                    targetPositions.TryGetValue(entityId, out Vector3 targetPosition))
+                    targetPositions.TryGetValue(entityId, out UnityEngine.Vector3 targetPosition))
                 {
                     // Smoothly move the entity to its target position
                     Vector3 oldPosition = entityObject.transform.position;
-                    entityObject.transform.position = Vector3.Lerp(
-                        oldPosition, 
-                        targetPosition, 
-                        Time.deltaTime * movementLerpSpeed
-                    );
                     
-                    // Log significant movements to help with debugging
-                    if (Vector3.Distance(oldPosition, entityObject.transform.position) > 0.01f)
+                    // Check if we need to move at all
+                    float distance = Vector3.Distance(oldPosition, targetPosition);
+                    if (distance > 0.001f)
                     {
-                        Debug.Log($"Entity {entityObject.name} moved from {oldPosition} to {entityObject.transform.position}, target: {targetPosition}");
+                        // Apply movement with lerp
+                        entityObject.transform.position = Vector3.Lerp(
+                            oldPosition, 
+                            targetPosition, 
+                            Time.deltaTime * movementLerpSpeed
+                        );
+                        
+                        // Log significant movements to help with debugging (only occasionally)
+                        if (distance > 0.1f && Time.frameCount % 10 == 0)
+                        {
+                            Debug.Log($"Entity {entityObject.name} moving from {oldPosition} to {entityObject.transform.position}, target: {targetPosition}, distance: {distance}");
+                        }
+                    }
+                }
+                else
+                {
+                    if (!entityGameObjects.ContainsKey(entityId))
+                    {
+                        Debug.LogWarning($"Entity with ID {entityId} not found in entityGameObjects");
+                    }
+                    else if (!targetPositions.ContainsKey(entityId))
+                    {
+                        Debug.LogWarning($"Entity with ID {entityId} not found in targetPositions");
                     }
                 }
             }
@@ -586,7 +625,7 @@ namespace Examples
                 simulationEndPanel.SetActive(false);
                 
             // Load new simulation
-            LoadSimulation();
+            StartCoroutine(LoadSimulationCoroutine());
         }
     }
 }

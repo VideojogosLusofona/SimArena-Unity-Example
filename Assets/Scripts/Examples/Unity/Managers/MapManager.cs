@@ -78,20 +78,35 @@ namespace Examples.Unity.Managers
                 {
                     for (int x = 0; x < width; x++)
                     {
-                        // Set the appropriate color based on the map cell
+                        bool isWalkable = false;
+                        bool isTransparent = false;
+                        
+                        // Set the appropriate properties based on the map cell
                         switch (mapGrid[x, y])
                         {
                             case '#': // Wall
                                 tilemap.SetTile(new Vector3Int(x, y, 0), wallTile);
+                                isWalkable = false;
+                                isTransparent = false;
                                 break;
                             case '.': // Floor
                                 tilemap.SetTile(new Vector3Int(x, y, 0), floorTile);
+                                isWalkable = true;
+                                isTransparent = true;
                                 break;
                             case '&': // Door
+                                isWalkable = true;
+                                isTransparent = false;
                                 break;
                             case 'O': // Window
+                                isWalkable = false;
+                                isTransparent = true;
                                 break;
                         }
+                        
+                        // Set the cell properties in the map
+                        Map.SetWalkable(x, y, isWalkable);
+                        Map.SetTransparent(x, y, isTransparent);
                     }
                 }
             }
