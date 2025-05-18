@@ -1,0 +1,56 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>RogueSharp</id>
+    <version>4.2.0</version>
+    <authors>Faron Bracy</authors>
+    <owners>Faron Bracy</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <licenseUrl>https://github.com/FaronBracy/RogueSharp/blob/master/LICENSE.txt</licenseUrl>
+    <projectUrl>https://github.com/FaronBracy/RogueSharp</projectUrl>
+    <iconUrl>https://content.screencast.com/users/dr.zeus/folders/Blog Links/media/66acf3c6-3b44-4bdd-b1f5-e89a62489b20/nugeticon.png</iconUrl>
+    <description>A .NET Standard class library providing map generation, path-finding, and field-of-view utilities frequently used in roguelikes or 2D tile based games. Inspired by libtcod
+
+New features:
+   * Optimized cave map generator (Thanks to James Neal)
+   * Optimized DijkstraShortestPath.FindPath method (Thanks to flend for this update)
+   * Multiple new "Try" methods which return null instead of throwing exceptions
+   * Diagonal paths can be found by using new constructors on GoalMap and PathFinder
+   * Map.GetCellsInCircle and Map.GetBorderCellsInCircle to get cells within a circular radius
+Breaking changes:
+   * Bug fix (4.2.0) - EdgeWeightedDigraph updates NumberOfEdges property when new edge is added
+   * Bug fix (4.1.0) - selecting border cells along edge of map no longer selects center cell
+   * Point and Rectangle classes are now structs (Thanks to James Neal)
+   * Updated all appropriate references to Cell with ICell (Thanks to Courtney Strachan)
+   * Map.ComputeFov and Map.AppendFov both return a ReadonlyCollection of ICell instead void
+   * The Path returned from PathFinder.ShortestPath now includes the source cell in the returned Path 
+   * Map.GetCellsInArea was renamed to Map.GetCellsInSquare
+   * Map.GetCellsInRadius was renamed to Map.GetCellsInDiamond</description>
+    <releaseNotes>A .NET Standard class library providing map generation, path-finding, and field-of-view utilities frequently used in roguelikes or 2D tile based games. Inspired by libtcod
+
+New features:
+   * Optimized cave map generator (Thanks to James Neal)
+   * Optimized DijkstraShortestPath.FindPath method (Thanks to flend for this update)
+   * Multiple new "Try" methods which return null instead of throwing exceptions
+   * Diagonal paths can be found by using new constructors on GoalMap and PathFinder
+   * Map.GetCellsInCircle and Map.GetBorderCellsInCircle to get cells within a circular radius
+Breaking changes:
+   * Bug fix (4.2.0) - EdgeWeightedDigraph updates NumberOfEdges property when new edge is added
+   * Bug fix (4.1.0) - selecting border cells along edge of map no longer selects center cell
+   * Point and Rectangle classes are now structs (Thanks to James Neal)
+   * Updated all appropriate references to Cell with ICell (Thanks to Courtney Strachan)
+   * Map.ComputeFov and Map.AppendFov both return a ReadonlyCollection of ICell instead void
+   * The Path returned from PathFinder.ShortestPath now includes the source cell in the returned Path 
+   * Map.GetCellsInArea was renamed to Map.GetCellsInSquare
+   * Map.GetCellsInRadius was renamed to Map.GetCellsInDiamond</releaseNotes>
+    <copyright>Copyright 2014-2019 Faron Bracy</copyright>
+    <tags>roguelike libtcod pathfinding game map random generator field-of-view fog-of-war dice</tags>
+    <repository type="Git" url="https://github.com/FaronBracy/RogueSharp.git" />
+    <dependencies>
+      <group targetFramework=".NETFramework4.0" />
+      <group targetFramework=".NETStandard1.0">
+        <dependency id="NETStandard.Library" version="1.6.1" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>
