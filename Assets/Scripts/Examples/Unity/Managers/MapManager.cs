@@ -1,4 +1,5 @@
 using System;
+using RogueSharp;
 using SimArena.Core.SimulationElements.Map;
 using SimArena.Core.SimulationElements.Map.Parser;
 using UnityEngine;

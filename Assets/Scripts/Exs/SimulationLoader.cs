@@ -4,18 +4,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Examples.Unity.Managers;
+using RogueSharp;
 using UnityEngine;
-using UnityEngine.Tilemaps;
 using SimArena.Core;
 using SimArena.Core.Configuration;
 using SimArena.Core.Entities;
 using SimArena.Core.Serialization.Configuration;
 using SimArena.Core.Serialization.Results;
 using SimArena.Core.SimulationElements.Map;
-using SimArena.Core.SimulationElements.Scene;
 using TMPro;
-using Random = UnityEngine.Random;
-using SimulationMode = SimArena.Core.SimulationMode;
+using Path = System.IO.Path;
 
 namespace Examples
 {
@@ -47,7 +45,6 @@ namespace Examples
 
         
         private IMap simulationMap => mapManager.Map;
-        private Scene simulationScene;
         
         // Entity tracking
         private Dictionary<Guid, GameObject> entityGameObjects = new();
@@ -81,13 +78,12 @@ namespace Examples
         {
             GameConfig config = ValidateConfig();
             yield return StartCoroutine(InitializeMapCoroutine(config));
-            InitializeScene();
             CreateSimulation(config);
             SubscribeToEvents();
     
             try
             {
-                simulation.Initialize(simulationMap, simulationScene);
+                simulation.Initialize(new GridMapBridge(simulation));
                 Debug.Log("Simulation initialized successfully");
             }
             catch (Exception ex)
@@ -110,19 +106,6 @@ namespace Examples
             }
         }
         
-        private void InitializeScene()
-        {
-            try
-            {
-                simulationScene = new MinimalScene(simulationMap);
-                Debug.Log("Scene created successfully");
-            }
-            catch (Exception sceneEx)
-            {
-                Debug.LogError($"Error creating scene: {sceneEx.Message}");
-            }
-        }
-        
         private void CreateSimulation(GameConfig config)
         {
             // Create the simulation
@@ -134,7 +117,7 @@ namespace Examples
                     return;
                 }
                     
-                simulation = new Simulation(config, SimulationMode.Realtime);
+                simulation = new Simulation(config);
                 Debug.Log("Simulation created successfully");
             }
             catch (Exception simEx)
