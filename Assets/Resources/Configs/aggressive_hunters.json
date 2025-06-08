@@ -1,0 +1,164 @@
+{
+  "Name": "Aggressive Hunters",
+  "MapPath": "",
+  "RealtimeMode": true,
+  "Agents": [
+    {
+      "Name": "Hunter-Team1-1",
+      "Brain": {
+        "Type": "ChaserBrain",
+        "BrainTypeName": "ChaserBrain",
+        "Awareness": 12,
+        "TickIntervalMs": 400,
+        "Team": 0,
+        "IsPassive": false
+      },
+      "RandomStart": true,
+      "MaxHealth": 100,
+      "AttackPower": 15,
+      "Defense": 5,
+      "Speed": 1.2
+    },
+    {
+      "Name": "Hunter-Team1-2",
+      "Brain": {
+        "Type": "ChaserBrain",
+        "BrainTypeName": "ChaserBrain",
+        "Awareness": 12,
+        "TickIntervalMs": 400,
+        "Team": 0,
+        "IsPassive": false
+      },
+      "RandomStart": true,
+      "MaxHealth": 100,
+      "AttackPower": 15,
+      "Defense": 5,
+      "Speed": 1.2
+    },
+    {
+      "Name": "Hunter-Team1-3",
+      "Brain": {
+        "Type": "ChaserBrain",
+        "BrainTypeName": "ChaserBrain",
+        "Awareness": 12,
+        "TickIntervalMs": 400,
+        "Team": 0,
+        "IsPassive": false
+      },
+      "RandomStart": true,
+      "MaxHealth": 100,
+      "AttackPower": 15,
+      "Defense": 5,
+      "Speed": 1.2
+    },
+    {
+      "Name": "Hunter-Team1-4",
+      "Brain": {
+        "Type": "ChaserBrain",
+        "BrainTypeName": "ChaserBrain",
+        "Awareness": 12,
+        "TickIntervalMs": 400,
+        "Team": 0,
+        "IsPassive": false
+      },
+      "RandomStart": true,
+      "MaxHealth": 100,
+      "AttackPower": 15,
+      "Defense": 5,
+      "Speed": 1.2
+    },
+    {
+      "Name": "Random-Team1-1",
+      "Brain": {
+        "Type": "RandomBrain",
+        "BrainTypeName": "RandomBrain",
+        "Awareness": 8,
+        "TickIntervalMs": 500,
+        "Team": 0
+      },
+      "RandomStart": true,
+      "MaxHealth": 100,
+      "AttackPower": 10,
+      "Defense": 5,
+      "Speed": 1.0
+    },
+    {
+      "Name": "Hunter-Team2-1",
+      "Brain": {
+        "Type": "ChaserBrain",
+        "BrainTypeName": "ChaserBrain",
+        "Awareness": 10,
+        "TickIntervalMs": 500,
+        "Team": 1,
+        "IsPassive": false
+      },
+      "RandomStart": true,
+      "MaxHealth": 100,
+      "AttackPower": 10,
+      "Defense": 8,
+      "Speed": 1.0
+    },
+    {
+      "Name": "Hunter-Team2-2",
+      "Brain": {
+        "Type": "ChaserBrain",
+        "BrainTypeName": "ChaserBrain",
+        "Awareness": 10,
+        "TickIntervalMs": 500,
+        "Team": 1,
+        "IsPassive": true
+      },
+      "RandomStart": true,
+      "MaxHealth": 100,
+      "AttackPower": 10,
+      "Defense": 8,
+      "Speed": 1.0
+    },
+    {
+      "Name": "Hunter-Team2-3",
+      "Brain": {
+        "Type": "ChaserBrain",
+        "BrainTypeName": "ChaserBrain",
+        "Awareness": 10,
+        "TickIntervalMs": 500,
+        "Team": 1,
+        "IsPassive": true
+      },
+      "RandomStart": true,
+      "MaxHealth": 100,
+      "AttackPower": 10,
+      "Defense": 8,
+      "Speed": 1.0
+    },
+    {
+      "Name": "Random-Team2-1",
+      "Brain": {
+        "Type": "RandomBrain",
+        "BrainTypeName": "RandomBrain",
+        "Awareness": 8,
+        "TickIntervalMs": 500,
+        "Team": 1
+      },
+      "RandomStart": true,
+      "MaxHealth": 100,
+      "AttackPower": 10,
+      "Defense": 5,
+      "Speed": 1.0
+    },
+    {
+      "Name": "Random-Team2-2",
+      "Brain": {
+        "Type": "RandomBrain",
+        "BrainTypeName": "RandomBrain",
+        "Awareness": 8,
+        "TickIntervalMs": 500,
+        "Team": 1
+      },
+      "RandomStart": true,
+      "MaxHealth": 100,
+      "AttackPower": 10,
+      "Defense": 5,
+      "Speed": 1.0
+    }
+  ]
+}
