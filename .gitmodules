@@ -7,3 +7,6 @@
 [submodule "Assets/External/SimArena"]
 	path = Assets/External/SimArena
 	url = https://github.com/arbyun/Simulation-Toolkit-AI.git
+[submodule "Assets/External/SimArenaToolkit"]
+	path = Assets/External/SimArenaToolkit
+	url = https://github.com/arbyun/Simulation-Toolkit-AI.git
